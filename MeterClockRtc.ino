@@ -119,7 +119,6 @@ void readRtc()
     min1sCount   = now.minute() % 10;
     sec10sCount  = now.second() / 10;
     sec1sCount   = now.second() % 10;
-  
 }
 
 
@@ -135,9 +134,6 @@ void processPwmValues()
     min1sValueEnd   = map( min1sCount,   0, 10, 0, 255 );
     sec10sValueEnd  = map( sec10sCount,  0, 10, 0, 255 );
     sec1sValueEnd   = map( sec1sCount,   0, 10, 0, 255 );
-
-
-
 }
 
 
@@ -153,7 +149,7 @@ void writeToMeters()
 
   
     // Loop to dampen meter movement to prevent meter damage.
-    // Loop is 100 mS.
+    // Loop is 100 mS. Larger value further dampend movement.
     for( loop = 0; loop < DAMPING_VALUE; loop++ )
     {
 /*       
@@ -229,12 +225,6 @@ void writeToMeters()
     min1sValueStart   = min1sValueEnd;
     sec10sValueStart  = sec10sValueEnd;
     sec1sValueStart   = sec1sValueEnd;
-
-
-    sec1sValueStart = sec1sValueEnd;
-
-
-
     
 }
 
@@ -280,4 +270,3 @@ void writeToLeds()
 //*****************************************************************************
 //*                 End of File
 //*****************************************************************************
-
