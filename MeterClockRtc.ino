@@ -8,41 +8,61 @@
 //*     PROJECT        : AmmeterClock
 //*
 //*     Clock will read HH : MM : SS
+//*     Date  will read Month : Day : Year (20XX)
 //*
 //*****************************************************************************
+//* Digital    : 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+//* Analog     : A0, A1, A2, A3, A4, A5
 //* Serial     : 0 (RX), 1 (TX)
-//* Interrupts : 2, 3. 
-//* PWM        : 3, 5, 6, 9, 10, 11. Provide 8-bit PWM output with the analogWrite() function.
-//* I2C        : A4 (SDA), A5 (SCL). 
-//* SPI        : 10 (SS), 11 (MOSI), 12 (MISO), 13 (SCK).
+//* Interrupts : 2 (Int 0), 3(Int 1). 
+//* PWM        : 3, 5, 6, 9, 10, 11.
+//* I2C        : A4 (I2C/SDA), A5 (I2C/SCL). 
+//* SPI        : 10 (SPI/SS), 11 (SPI/MOSI), 12 (SPI/MISO), 13 (SPI/SCK).
 //* LED        : 13 
 //* Reset      : Bring this line LOW to reset the microcontroller.
 //*
 //*****************************************************************************
 //*
 
+//********************
 // Includes:
 //********************
 #include <Wire.h>
 #include "RTClib.h"
 
 
+
+//********************
 // Definitions:
 //********************
-// Arduino UNO I/O port Definitions:
-// AnalogWrite pins on UNO 3, 5, 6, 9, 10, and 11 for disply meters.
-#define PIN_HR10S    11    // Hours  10's position
-#define PIN_HR1S     10    // Hours  1's  position
-#define PIN_MIN10S    9    // Minute 10's position
-#define PIN_MIN1S     6    // Minute 1's  position
-#define PIN_SEC10S    5    // Second 10's position
-#define PIN_SEC1S     3    // Second 1's  position
-
 #define DAMPING_VALUE 10
 
-// DIO pins on UNO 2, 4, 7, 8, 12, 13 for LEDs.
+// Arduino UNO I/O port Definitions:
+// Digital PWM pins on UNO 3, 5, 6, 9, 10, and 11 for disply meters.
+#define PIN_HR10S       11   // Hours  10's position
+#define PIN_HR1S        10   // Hours  1's  position
+#define PIN_MIN10S       9   // Minute 10's position
+#define PIN_MIN1S        6   // Minute 1's  position
+#define PIN_SEC10S       5   // Second 10's position
+#define PIN_SEC1S        3   // Second 1's  position
+
+// Digital I/O pins on UNO 2, 4, 7, 8, 12, 13 for LEDs.
+#define PIN_LED1         2   // 
+#define PIN_LED2         4   // 
+#define PIN_LED3         7   // 
+#define PIN_LED4         8   // 
+
+// Analog input pins for time and date setting.
+#define PIN_RUN-SET     A0   // 
+#define PIN_DATE-TIME   A1   //
+#define PIN_HR-MONTH    A2   //
+#define PIN_MIN-DAY     A3   //
+#define PIN_SEC_YEAR    A4   //
+//#define PIN_          A5   //
 
 
+
+//********************
 // Global Variables:
 //********************
 RTC_Millis rtc;
