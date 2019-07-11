@@ -4,8 +4,10 @@
 //*
 //*
 //*     FILE NAME      : AmmeterClock
-//*     DATE OF ORIGIN : January 2018
+//*     DATE OF ORIGIN : July 2019
 //*     PROJECT        : AmmeterClock
+//*
+//*     Clock will read HH : MM : SS
 //*
 //*****************************************************************************
 //* Serial     : 0 (RX), 1 (TX)
@@ -36,7 +38,7 @@
 #define PIN_SEC10S    5    // Second 10's position
 #define PIN_SEC1S     3    // Second 1's  position
 
-#define DAMPING_VALUE 10
+#define DAMPING_VALUE 100
 
 // DIO pins on UNO 2, 4, 7, 8, 12, 13 for LEDs.
 
@@ -44,13 +46,14 @@
 // Global Variables:
 //********************
 RTC_Millis rtc;
+DateTime currentTime;
 
-byte hour10sCount = 0;
-byte hour1sCount  = 0;
-byte min10sCount  = 0;
-byte min1sCount   = 0;
-byte sec10sCount  = 0;
-byte sec1sCount   = 0;
+byte hour10sCount      = 0;
+byte hour1sCount       = 0;
+byte min10sCount       = 0;
+byte min1sCount        = 0;
+byte sec10sCount       = 0;
+byte sec1sCount        = 0;
 
 byte hour10sValueStart = 0;
 byte hour1sValueStart  = 0;
@@ -67,35 +70,35 @@ byte sec10sValueEnd    = 0;
 byte sec1sValueEnd     = 0;
   
 
-
-//*****************************************************************************
+//********************************************************************************
 //*                 Required setup routine, program start
-//*****************************************************************************
+//********************************************************************************
 void setup() 
 {
     // Open the serial port at 9600 bps.
-    Serial.begin(9600);
+    Serial.begin( 9600 );
 
     // The following line sets the RTC to the date & time the sketch was compiled.
-    rtc.begin(DateTime(__DATE__, __TIME__));
+    rtc.begin( DateTime(__DATE__, __TIME__) );  
 }
 
 
 
-//**************************************
+//********************************************************************************
 //*         Main program loop            
-//**************************************
+//********************************************************************************
 void loop() 
 {
-    // Read current time from RTC 
+    // Read current time from RTC (real time clock)
     readRtc();
 
+    // Was used for debugging
     //printToConsole();
 
     // Convert time values to corresponding PWM value.
-    processPwmValues();
+    mapPwmValues();
 
-    // Send the PWM values to the meters
+    // Send the PWM values to the reapective meters.
     writeToMeters();
 
     // Set display LED pattern.
@@ -104,30 +107,31 @@ void loop()
 }
 
 
-//**************************************
+//********************************************************************************
 //*                     
-//**************************************
+//********************************************************************************
 void readRtc()
 {
-    // Read RTC and load values into time count.
+    // Read RTC and load current time values into time count.
 
-    DateTime now = rtc.now();
+    currentTime = rtc.now();
    
-    hour10sCount =   now.hour() / 10;
-    hour1sCount  =   now.hour() % 10;
-    min10sCount  = now.minute() / 10;
-    min1sCount   = now.minute() % 10;
-    sec10sCount  = now.second() / 10;
-    sec1sCount   = now.second() % 10;
+    hour10sCount = currentTime.hour()   / 10;
+    hour1sCount  = currentTime.hour()   % 10;
+    min10sCount  = currentTime.minute() / 10;
+    min1sCount   = currentTime.minute() % 10;
+    sec10sCount  = currentTime.second() / 10;
+    sec1sCount   = currentTime.second() % 10;
 }
 
 
 
-//**************************************
+//********************************************************************************
 //*                     
-//**************************************
-void processPwmValues()
+//********************************************************************************
+void mapPwmValues()
 {
+    // Map the individual time position value (0-9) to a PWM output value (0-255)
     hour10sValueEnd = map( hour10sCount, 0, 10, 0, 255 );
     hour1sValueEnd  = map( hour1sCount,  0, 10, 0, 255 ); 
     min10sValueEnd  = map( min10sCount,  0, 10, 0, 255 );
@@ -138,79 +142,52 @@ void processPwmValues()
 
 
 
-//**************************************
+//********************************************************************************
 //*                     
-//**************************************
+//********************************************************************************
 void writeToMeters()
 {
     byte loop;
-    byte dampingCount = 0;
+    float calcVal;
 
 
-  
-    // Loop to dampen meter movement to prevent meter damage.
-    // Loop is 100 mS. Larger value further dampend movement.
-    for( loop = 0; loop < DAMPING_VALUE; loop++ )
+    // Note: A useful side effect of the rollover from max PWM value to 0 is
+    // the offset calculations become negative. When added to the current
+    // PWM value the meter slowly returns to 0 instead of slaming the needle.
+     
+    // Create a needle movement dampening loop to prevent meter damage.
+    // Larger dampening values slow meter movement dampend movement.
+    for( loop = 0; loop < 10; loop++ )
     {
-/*       
-      for( int dampingCount = lastMeasurement; dampingCount <= newMeasurement; dampingCount++ )
-      {
-          analogWrite( pwmPin, count2 );
-          delay( 10 );
-      }
-
-      lastMeasurement = newMeasurement;
- 
-        if( hour10sValueEnd  == 0 )
-            analogWrite( PIN_HR10S,  hour10sValueStart - (((hour10sValueEnd - hour10sValueStart) / DAMPING_VALUE) * loop) );
-        else 
-            analogWrite( PIN_HR10S,  (((hour10sValueEnd - hour10sValueStart) / DAMPING_VALUE) * loop) + hour10sValueStart );
+        // Set hours
+        calcVal = ( float(hour10sValueEnd - hour10sValueStart) / float(DAMPING_VALUE) );
+        analogWrite( PIN_HR10S,  (calcVal * float(loop)) + float(hour10sValueStart ) );
+    
+        calcVal = ( float(hour1sValueEnd - hour1sValueStart) / float(DAMPING_VALUE) );
+        analogWrite( PIN_HR1S,  (calcVal * float(loop)) + float(hour1sValueStart ) );
 
 
-        if( hour1sValueEnd  == 0 )
-            analogWrite( PIN_HR1S,   hour1sValueStart - (((hour1sValueEnd  - hour1sValueStart)  / DAMPING_VALUE) * loop) );
-        else 
-            analogWrite( PIN_HR1S,   (((hour1sValueEnd  - hour1sValueStart)  / DAMPING_VALUE) * loop) + hour1sValueStart  );
+        // Set minutes
+        calcVal = ( float(min10sValueEnd - min10sValueStart) / float(DAMPING_VALUE) );
+        analogWrite( PIN_MIN10S,  (calcVal * float(loop)) + float(min10sValueStart ) );
+    
+        calcVal = ( float(min1sValueEnd - min1sValueStart) / float(DAMPING_VALUE) );
+        analogWrite( PIN_MIN1S,  (calcVal * float(loop)) + float(min1sValueStart ) );
 
 
-        if( min10sValueEnd  == 0 )
-            analogWrite( PIN_MIN10S, min10sValueStart - (((min10sValueEnd  - min10sValueStart)  / DAMPING_VALUE) * loop) );
-        else 
-            analogWrite( PIN_MIN10S, (((min10sValueEnd  - min10sValueStart)  / DAMPING_VALUE) * loop) + min10sValueStart );
+        // Set seconds
+        calcVal = ( float(sec10sValueEnd - sec10sValueStart) / float(DAMPING_VALUE) );
+        analogWrite( PIN_SEC10S,  (calcVal * float(loop)) + float(sec10sValueStart ) );
+    
+        calcVal = ( float(sec1sValueEnd - sec1sValueStart) / float(DAMPING_VALUE) );
+        analogWrite( PIN_SEC1S,  (calcVal * float(loop)) + float(sec1sValueStart ) );
 
-
-        if( min1sValueEnd  == 0 )
-            analogWrite( PIN_MIN1S,  min1sValueStart - (((min1sValueEnd   - min1sValueStart)   / DAMPING_VALUE) * loop) );
-        else 
-            analogWrite( PIN_MIN1S,  (((min1sValueEnd   - min1sValueStart)   / DAMPING_VALUE) * loop) + min1sValueStart );
-
-
-        if( sec10sValueEnd  == 0 )
-            analogWrite( PIN_SEC10S, sec10sValueStart - (((sec10sValueEnd  - sec10sValueStart)  / DAMPING_VALUE) * loop) );
-        else 
-            analogWrite( PIN_SEC10S, (((sec10sValueEnd  - sec10sValueStart)  / DAMPING_VALUE) * loop) + sec10sValueStart );
-*/
-
-        if( sec1sValueEnd  == 0 )
-        {
-            analogWrite( PIN_SEC1S,  sec1sValueStart - (((sec1sValueEnd   - sec1sValueStart)   / DAMPING_VALUE) * loop) );
-            Serial.print( "Down: ");
-            Serial.print( sec1sValueStart - (((sec1sValueEnd   - sec1sValueStart)   / DAMPING_VALUE) * loop), DEC );
-            Serial.println();
-        }
-        else 
-        {
-            analogWrite( PIN_SEC1S,  (((sec1sValueEnd   - sec1sValueStart)   / DAMPING_VALUE) * loop) + sec1sValueStart );
-            Serial.print( "  Up: ");
-            Serial.print( (((sec1sValueEnd   - sec1sValueStart)   / DAMPING_VALUE) * loop) + sec1sValueStart, DEC );
-            Serial.println();
-        }
-        
-        
-        delay( 100 );
+       
+        delay( DAMPING_VALUE );
     }
 
-    // Make final adjustments.
+    // Final value may be off slightly due to integer math in loop calculations above.
+    // Make final adjustments. 
     analogWrite( PIN_HR10S,  hour10sValueEnd );
     analogWrite( PIN_HR1S,   hour1sValueEnd );
     analogWrite( PIN_MIN10S, min10sValueEnd );
@@ -218,7 +195,7 @@ void writeToMeters()
     analogWrite( PIN_SEC10S, sec10sValueEnd );
     analogWrite( PIN_SEC1S,  sec1sValueEnd );
 
-
+    // The start of the next meter PWM setting is the end of the current PWM setting.
     hour10sValueStart = hour10sValueEnd;
     hour1sValueStart  = hour1sValueEnd;
     min10sValueStart  = min10sValueEnd;
@@ -229,17 +206,18 @@ void writeToMeters()
 }
 
 
-//**************************************
+//********************************************************************************
 //*                     
-//**************************************
-void printToConsole()
+//********************************************************************************
+void printTimeToConsole()
 {
-    DateTime now = rtc.now();
-    Serial.print( now.hour(),   DEC );
+    // This routine was used for debugging. 
+    // May be needed as features are added.
+    Serial.print( currentTime.hour(),   DEC );
     Serial.print( " : ");
-    Serial.print( now.minute(), DEC );
+    Serial.print( currentTime.minute(), DEC );
     Serial.print( " : ");
-    Serial.print( now.second(), DEC );
+    Serial.print( currentTime.second(), DEC );
 
     Serial.print( " >>>>> ");
     
@@ -256,9 +234,9 @@ void printToConsole()
 }
 
     
-//**************************************
+//********************************************************************************
 //*                     
-//**************************************
+//********************************************************************************
 void writeToLeds()
 {
     
@@ -267,6 +245,7 @@ void writeToLeds()
 
  
 
-//*****************************************************************************
+//********************************************************************************
 //*                 End of File
-//*****************************************************************************
+//********************************************************************************
+
