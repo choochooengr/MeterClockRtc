@@ -38,7 +38,7 @@
 #define PIN_SEC10S    5    // Second 10's position
 #define PIN_SEC1S     3    // Second 1's  position
 
-#define DAMPING_VALUE 100
+#define DAMPING_VALUE 10
 
 // DIO pins on UNO 2, 4, 7, 8, 12, 13 for LEDs.
 
@@ -93,7 +93,7 @@ void loop()
     readRtc();
 
     // Was used for debugging
-    //printToConsole();
+    printTimeToConsole();
 
     // Convert time values to corresponding PWM value.
     mapPwmValues();
@@ -159,31 +159,33 @@ void writeToMeters()
     // Larger dampening values slow meter movement dampend movement.
     for( loop = 0; loop < 10; loop++ )
     {
+      
         // Set hours
-        calcVal = ( float(hour10sValueEnd - hour10sValueStart) / float(DAMPING_VALUE) );
+        calcVal = ( float(hour10sValueEnd - hour10sValueStart) / 10.0 );
         analogWrite( PIN_HR10S,  (calcVal * float(loop)) + float(hour10sValueStart ) );
     
-        calcVal = ( float(hour1sValueEnd - hour1sValueStart) / float(DAMPING_VALUE) );
+        calcVal = ( float(hour1sValueEnd - hour1sValueStart) / 10.0 );
         analogWrite( PIN_HR1S,  (calcVal * float(loop)) + float(hour1sValueStart ) );
 
 
         // Set minutes
-        calcVal = ( float(min10sValueEnd - min10sValueStart) / float(DAMPING_VALUE) );
+        calcVal = ( float(min10sValueEnd - min10sValueStart) / 10.0 );
         analogWrite( PIN_MIN10S,  (calcVal * float(loop)) + float(min10sValueStart ) );
     
-        calcVal = ( float(min1sValueEnd - min1sValueStart) / float(DAMPING_VALUE) );
+        calcVal = ( float(min1sValueEnd - min1sValueStart) / 10.0 );
         analogWrite( PIN_MIN1S,  (calcVal * float(loop)) + float(min1sValueStart ) );
 
 
         // Set seconds
-        calcVal = ( float(sec10sValueEnd - sec10sValueStart) / float(DAMPING_VALUE) );
+        calcVal = ( float(sec10sValueEnd - sec10sValueStart) / 10.0 );
         analogWrite( PIN_SEC10S,  (calcVal * float(loop)) + float(sec10sValueStart ) );
     
-        calcVal = ( float(sec1sValueEnd - sec1sValueStart) / float(DAMPING_VALUE) );
+        calcVal = ( float(sec1sValueEnd - sec1sValueStart) / 10.0 );
+        Serial.println( (calcVal * float(loop)) + float(sec1sValueStart ), DEC);
         analogWrite( PIN_SEC1S,  (calcVal * float(loop)) + float(sec1sValueStart ) );
 
        
-        delay( DAMPING_VALUE );
+        delay( 100 );
     }
 
     // Final value may be off slightly due to integer math in loop calculations above.
@@ -218,7 +220,7 @@ void printTimeToConsole()
     Serial.print( currentTime.minute(), DEC );
     Serial.print( " : ");
     Serial.print( currentTime.second(), DEC );
-
+/*
     Serial.print( " >>>>> ");
     
     Serial.print( hour10sCount, DEC );
@@ -229,7 +231,7 @@ void printTimeToConsole()
     Serial.print( " : ");
     Serial.print( sec10sCount,  DEC );
     Serial.print( sec1sCount,   DEC );
-
+*/
     Serial.println();
 }
 
@@ -239,7 +241,7 @@ void printTimeToConsole()
 //********************************************************************************
 void writeToLeds()
 {
-    
+    // This routine makes some LEDs blink on the front panel.     
 
 }
 
