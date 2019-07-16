@@ -53,11 +53,11 @@
 #define PIN_LED4         8   // 
 
 // Analog input pins for time and date setting.
-#define PIN_RUN-SET     A0   // 
-#define PIN_DATE-TIME   A1   //
-#define PIN_HR-MONTH    A2   //
-#define PIN_MIN-DAY     A3   //
-#define PIN_SEC_YEAR    A4   //
+#define PIN_RUN_SET     A0   // 
+#define PIN_DATE_TIME   A1   //
+#define PIN_HR_YEAR     A2   //
+#define PIN_MIN_MONTH   A3   //
+#define PIN_SEC_DAY     A4   //
 //#define PIN_          A5   //
 
 
@@ -89,7 +89,14 @@ byte min1sValueEnd     = 0;
 byte sec10sValueEnd    = 0;
 byte sec1sValueEnd     = 0;
   
+byte year  = 19; 
+byte month =  1; 
+byte day   =  1;
+byte hour  =  0;
+byte min   =  0;
+byte sec   =  0;
 
+bool runSet = 0;
 //********************************************************************************
 //*                 Required setup routine, program start
 //********************************************************************************
@@ -109,20 +116,49 @@ void setup()
 //********************************************************************************
 void loop() 
 {
-    // Read current time from RTC (real time clock)
-    readRtc();
+    
 
-    // Was used for debugging
-    printTimeToConsole();
+    // Debounce Run/Set selector. 
+    if( analogRead( PIN_RUN_SET ) > 512 )
+    {
+        delay( 25 );
+        if( analogRead( PIN_RUN_SET ) > 512 )
+        {
+            runSet = 1;
+        }
+    }
 
-    // Convert time values to corresponding PWM value.
-    mapPwmValues();
 
-    // Send the PWM values to the reapective meters.
-    writeToMeters();
+    if( runSet == 1 )
+    {
+        Serial.println( " run ");
+        // Read current time from RTC (real time clock)
+        readRtc();
 
-    // Set display LED pattern.
-    writeToLeds();
+        // Was used for debugging
+        printTimeToConsole();
+
+        // Convert time values to corresponding PWM value.
+        mapPwmValues();
+
+        // Send the PWM values to the reapective meters.
+        writeToMeters();
+
+        // Set display LED pattern.
+        writeToLeds();
+    }
+    else
+    {
+        Serial.println( " set ");
+
+        setTime();
+
+        // Read current time from RTC (real time clock)
+        readRtc();
+
+        // Was used for debugging
+        printTimeToConsole();
+    }
               
 }
 
@@ -142,6 +178,10 @@ void readRtc()
     min1sCount   = currentTime.minute() % 10;
     sec10sCount  = currentTime.second() / 10;
     sec1sCount   = currentTime.second() % 10;
+
+    // Add 1 to count to allow needle to go to full scale.
+    // The needle return takes one sec anyway. We never see 0.
+    sec1sCount++; 
 }
 
 
@@ -201,8 +241,8 @@ void writeToMeters()
         analogWrite( PIN_SEC10S,  (calcVal * float(loop)) + float(sec10sValueStart ) );
     
         calcVal = ( float(sec1sValueEnd - sec1sValueStart) / 10.0 );
-        Serial.println( (calcVal * float(loop)) + float(sec1sValueStart ), DEC);
         analogWrite( PIN_SEC1S,  (calcVal * float(loop)) + float(sec1sValueStart ) );
+        //Serial.println( (calcVal * float(loop)) + float(sec1sValueStart ), DEC);
 
        
         delay( 100 );
@@ -265,6 +305,105 @@ void writeToLeds()
 
 }
 
+
+//********************************************************************************
+//*                     
+//********************************************************************************
+void setTime()
+{
+    bool hourDayOld = 0;
+    bool hourDayNew = 0;
+    
+    bool minDayOld  = 0;
+    bool minDayNew  = 0;
+
+    bool secDayOld  = 0;
+    bool secDayNew  = 0;
+
+    bool runSetOld  = 0;
+    bool runSetNew  = 0;
+
+    
+    currentTime = rtc.now();
+    byte hr = currentTime.hour();
+    byte mn = currentTime.minute();
+    byte s  = currentTime.second();
+
+    while( runSet == 0 )
+    {
+
+        // Debounce hour selector.
+        hourDayNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+        if( hourDayNew != hourDayOld )
+        {
+            hourDayOld = hourDayNew;
+            delay( 25 );
+            hourDayNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+            if( hourDayNew == hourDayOld && hourDayNew == 0 )
+            {                
+                hr++;
+            }
+        }
+
+
+        // Debounce minute selector.
+        minDayNew = ( analogRead( PIN_MIN_MONTH ) > 512 );
+        if( minDayNew != minDayOld )
+        {
+            minDayOld = minDayNew;
+            delay( 25 );
+            minDayNew = ( analogRead( PIN_MIN_MONTH ) > 512 );
+            if( minDayNew == minDayOld && minDayNew == 0 )
+            {                
+                mn++;
+            }
+        }
+
+
+        // Debounce second selector.
+        secDayNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+        if( secDayNew != secDayOld )
+        {
+            secDayOld = secDayNew;
+            delay( 25 );
+            secDayNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+            if( secDayNew == secDayOld && secDayNew == 0 )
+            {                
+                s++;
+            }
+        }
+
+        Serial.print( hr, DEC);
+        Serial.print( " : ");
+        Serial.println( mn, DEC);
+        Serial.print( " : ");
+        Serial.println( s, DEC);
+
+        // Debounce run/set selector.
+        runSetNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+        if( runSetNew != runSet )
+        {
+            runSet = runSetNew;
+            delay( 25 );
+            runSetNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+            if( runSetNew == runSet && runSetNew == 1 )
+            {                
+                runSet = 0;
+            }
+        }        
+        
+    }
+    
+    //DateTime ( 2000+year, month, day, hour, min, sec );
+    //DateTime dt ( year, month, day, hour, min, sec );
+    
+    // This routine allows setting of date and time 
+    //rtc.adjust( dt );    
+
+}
+
+ 
+    
  
 
 //********************************************************************************
