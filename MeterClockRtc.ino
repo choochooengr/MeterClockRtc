@@ -66,6 +66,7 @@
 //********************
 RTC_Millis rtc;
 DateTime currentTime;
+byte debounceTime      = 10;
 
 byte dampingValue      = 100;
 
@@ -90,7 +91,8 @@ byte min1sValueEnd     = 0;
 byte sec10sValueEnd    = 0;
 byte sec1sValueEnd     = 0;
 
-bool runSet    = 0;
+bool runSet    =  0;
+bool dateTime  =  0;
 byte setYear   = 19; 
 byte setMonth  =  1; 
 byte setDay    =  1;
@@ -118,23 +120,28 @@ void setup()
 //********************************************************************************
 void loop() 
 {
-    // Debounce Run/Set selector. 
-    if( analogRead( PIN_RUN_SET ) > 512 )
+    // Debounce run/set selector.
+    if( analogRead( PIN_RUN_SET ) > 512  )
     {
-        delay( 25 );
-        if( analogRead( PIN_RUN_SET ) > 512 )
+        // Switch signal high
+        // Wait for switch debounce
+        delay( debounceTime );
+
+        // Re-read switch after debounce time and 
+        // if still high, set signal to high, else low.
+        if( analogRead( PIN_RUN_SET ) > 512 )             
             runSet = 1;
-        else 
-            runSet = 0;
+        else
+            runSet = 0; 
     }
     else
     {
-        delay( 25 );
-        if( analogRead( PIN_RUN_SET ) < 512 )
-            runSet = 0;
+        // Switch signal low.
+        runSet = 0;
     }
 
 
+    // Determine if run or set is selected
     if( runSet == 1 )
     {
         Serial.println( " run ");
@@ -142,7 +149,7 @@ void loop()
         readRtc();
 
         // Was used for debugging
-        printTimeToConsole();
+        //printTimeToConsole();
 
         // Convert time values to corresponding PWM value.
         mapPwmValues();
@@ -153,7 +160,7 @@ void loop()
         // Set display LED pattern.
         writeToLeds();
     }
-    else // runSet == 0
+    else // Set was selected.
     {
         Serial.println( " set ");
 
@@ -168,12 +175,21 @@ void loop()
 //********************************************************************************
 void readRtc()
 {
-    // Read RTC and load current time values into time count.
+    byte hr12;
 
+    
+    // Read RTC and load current time values into time count.
     currentTime = rtc.now();
-   
-    hour10sCount = currentTime.hour()   / 10;
-    hour1sCount  = currentTime.hour()   % 10;
+
+    // Change time from 24 to 12 hour format
+    if( currentTime.hour() > 12 )
+        hr12 = currentTime.hour() - 12;
+    else
+        hr12 = currentTime.hour();
+    
+    hour10sCount = hr12 / 10;
+    hour1sCount  = hr12 % 10;
+  
     min10sCount  = currentTime.minute() / 10;
     min1sCount   = currentTime.minute() % 10;
     sec10sCount  = currentTime.second() / 10;
@@ -182,6 +198,16 @@ void readRtc()
     // Add 1 to count to allow needle to go to full scale.
     // The needle return takes one sec anyway. We never see 0.
     sec1sCount++; 
+
+
+    // This routine was used for debugging. 
+    // May be needed as features are added.
+    Serial.print( hr12,   DEC );
+    Serial.print( " : ");
+    Serial.print( currentTime.minute(), DEC );
+    Serial.print( " : ");
+    Serial.print( currentTime.second(), DEC );
+    Serial.println();
 }
 
 
@@ -318,11 +344,13 @@ void writeToLeds()
 //********************************************************************************
 void setTime()
 {
-    bool hourDayOld = 0;
-    bool hourDayNew = 0;
+    byte hr12;
     
-    bool minDayOld  = 0;
-    bool minDayNew  = 0;
+    bool hourYearOld = 0;
+    bool hourYearNew = 0;
+    
+    bool minMonthOld  = 0;
+    bool minMonthNew  = 0;
 
     bool secDayOld  = 0;
     bool secDayNew  = 0;
@@ -330,50 +358,88 @@ void setTime()
     bool runSetOld  = 0;
     bool runSetNew  = 0;
 
-    
+
+    // Collect current time from RTC
     currentTime = rtc.now();
-    //setYear   = currentTime.
-    //setMonth  = currentTime.
-    //setDay    = currentTime. 
+    setYear   = currentTime.year();
+    setMonth  = currentTime.month();
+    setDay    = currentTime.day();
     setHour   = currentTime.hour(); 
     setMinute = currentTime.minute(); 
     setSecond = currentTime.second();
 
-dampingValue      = 10;
+    // Change time from 24 to 12 hour format
+    if( currentTime.hour() > 12 )
+        setHour = currentTime.hour() - 12;
+    else
+        setHour = currentTime.hour();
+
+        
+
+    dampingValue      = 10;
 
     while( runSet == 0 )
     {
 
-        // Debounce hour selector.
-        hourDayNew = ( analogRead( PIN_HR_YEAR ) > 512 );
-        if( hourDayNew != hourDayOld )
+        // Debounce date/time selector.
+        if( analogRead( PIN_DATE_TIME ) > 512  )
         {
-            hourDayOld = hourDayNew;
-            delay( 25 );
-            hourDayNew = ( analogRead( PIN_HR_YEAR ) > 512 );
-            if( hourDayNew == hourDayOld && hourDayNew == 0 )
-            {                
-                setHour++;
+            delay( debounceTime );
+            if( analogRead( PIN_DATE_TIME ) > 512 )             
+                dateTime = 1;
+            else
+                dateTime = 0; 
+        }
+        else
+            dateTime = 0; 
+            
 
-                if( setHour >= 13 )
-                    setHour = 0;
+        // Debounce hour selector.
+        hourYearNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+        if( hourYearNew != hourYearOld )
+        {
+            hourYearOld = hourYearNew;
+            delay( debounceTime );
+            hourYearNew = ( analogRead( PIN_HR_YEAR ) > 512 );
+            if( hourYearNew == hourYearOld && hourYearNew == 0 )
+            {
+                if( dateTime == 0 )
+                {                
+                    setHour++;
+                    if( setHour >= 13 )
+                        setHour = 0;
+                }
+                else
+                {                
+                    setYear++;
+                    if( setYear >= 30 )
+                        setYear = 0;
+                }                
             }
         }
 
 
         // Debounce minute selector.
-        minDayNew = ( analogRead( PIN_MIN_MONTH ) > 512 );
-        if( minDayNew != minDayOld )
+        minMonthNew = ( analogRead( PIN_MIN_MONTH ) > 512 );
+        if( minMonthNew != minMonthOld )
         {
-            minDayOld = minDayNew;
-            delay( 25 );
-            minDayNew = ( analogRead( PIN_MIN_MONTH ) > 512 );
-            if( minDayNew == minDayOld && minDayNew == 0 )
-            {                
-                setMinute++;
-
-                if( setMinute >= 60 )
-                    setMinute = 0;
+            minMonthOld = minMonthNew;
+            delay( debounceTime );
+            minMonthNew = ( analogRead( PIN_MIN_MONTH ) > 512 );
+            if( minMonthNew == minMonthOld && minMonthNew == 0 )
+            {
+              if( dateTime == 0 )
+                {                
+                    setMinute++;
+                    if( setMinute >= 60 )
+                        setMinute = 0;
+                }
+                else
+                {                
+                    setMonth++;
+                    if( setMonth >= 30 )
+                        setMonth = 0;
+                } 
             }
         }
 
@@ -383,23 +449,45 @@ dampingValue      = 10;
         if( secDayNew != secDayOld )
         {
             secDayOld = secDayNew;
-            delay( 25 );
+            delay( debounceTime );
             secDayNew = ( analogRead( PIN_SEC_DAY ) > 512 );
             if( secDayNew == secDayOld && secDayNew == 0 )
-            {                
-                setSecond++;
-
-                if( setSecond >= 60 )
-                    setSecond = 0;
+            {
+                if( dateTime == 0 )
+                {                
+                    setSecond++;
+                    if( setSecond >= 60 )
+                        setSecond = 0;
+                }
+                else
+                {                
+                    setDay++;
+                    if( setDay >= 31 )
+                        setDay = 0;
+                } 
             }
         }
-        
-        Serial.print( setHour, DEC);
-        Serial.print( " : ");
-        Serial.print( setMinute, DEC);
-        Serial.print( " : ");
-        Serial.print( setSecond, DEC);
-        Serial.println( "  ");
+
+
+        if( dateTime == 0 )
+            Serial.print( "Date: " );
+        else
+            Serial.print( "Time: " );
+       
+        Serial.print( setYear, DEC );
+        Serial.print( " : " );
+        Serial.print( setMonth, DEC );
+        Serial.print( " : " );
+        Serial.print( setDay, DEC);
+        Serial.print( "         " );
+
+        Serial.print( setHour, DEC );
+        Serial.print( " : " );
+        Serial.print( setMinute, DEC );
+        Serial.print( " : " );
+        Serial.print( setSecond, DEC );
+        Serial.println( "  " );
+
 
         setCount();
         mapPwmValues();
@@ -409,7 +497,7 @@ dampingValue      = 10;
         // Debounce run/set selector.
         if( analogRead( PIN_RUN_SET ) > 512  )
         {
-            delay( 25 );
+            delay( debounceTime );
             if( analogRead( PIN_RUN_SET ) > 512 )             
                 runSet = 1;
             else
@@ -422,7 +510,7 @@ dampingValue      = 10;
 
         dampingValue      = 100;
 
-        Serial.print( "Final : ");
+        Serial.print( "Final Time Set: ");
         Serial.print( setHour, DEC);
         Serial.print( " : ");
         Serial.print( setMinute, DEC);
@@ -430,10 +518,11 @@ dampingValue      = 10;
         Serial.print( setSecond, DEC);
         Serial.println( "  ");
     
-    // DateTime ( 2000+year, month, day, hour, min, sec );
+    // Caclulate DateTime structure( 2000+year, month, day, hour, min, sec );
+    setSecond = 0;
     DateTime dt ( setYear, setMonth, setDay, setHour, setMinute, setSecond );
     
-    // This routine allows setting of date and time 
+    // This routine sets the date and time 
     rtc.adjust( dt );    
 
 }
